@@ -1,6 +1,6 @@
 {
- "version": "2.1",
+ "version": "2.2",
  "zip": "update.zip",
- "sha256": "4053f49709443e65647e26633836fb3773efa20ad4f7b76ecef3276cfb7a954e",
- "notes": "versi awal"
+ "sha256": "42df83a314ab362af9f702d60ed6608adae0aa351552691a724f80b7d27c5345",
+ "notes": "pilihan tema warna (Awal, Kopi, Samudra, Senja)"
 }

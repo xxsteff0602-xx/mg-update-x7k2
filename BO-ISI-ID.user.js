@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEGA GAMING - Isi TID + User ID ke Sheet & Auto Confirm Deposit
 // @namespace    mega-gaming
-// @version      3.6
+// @version      3.8
 // @updateURL    https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @downloadURL  https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @description  Baca deposit di BO (semua domain panel UG / GIGA), isi Username + Transaction ID ke Buku di aplikasi MEGA GAMING (atau Google Sheet), dicocokkan dengan nama pengirim myBCA, dan opsional auto confirm deposit yang cocok.
@@ -25,7 +25,8 @@
   //   GIGA: /transactions/instant_transaction/deposit_only   UG: /instant_transaction/deposit_only
   if (!/\/instant_transaction\/deposit_only/i.test(location.pathname)) return;
 
-  const EVERY = 10000;          // ms
+  const every = () => Math.min(60, Math.max(3, Number(GM_getValue('every', 10)) || 10)) * 1000;   // baca tabel tiap x detik (diatur di panel)
+  const FAST = 2000;            // cek "ada deposit baru?" ke aplikasi tiap 2 detik (murah, tanpa baca tabel)
   const MAX_AGE = 36 * 3600e3;  // abaikan transaksi lebih tua dari 36 jam
   const MAX_CONFIRM_PER_SCAN = 3;
   const MAX_REJECT_PER_SCAN = 2;
@@ -144,7 +145,7 @@
   function panel() {
     const c = cfg(); const pn = root.getElementById('pn'); const old = pn.querySelector('.panel'); const keep = old ? old.scrollTop : 0;
     const bd = brand();
-    const d = draft || (draft = { url: c.url, secret: c.secret, label: c.label || bd.name, mode: c.mode, rej: c.rej, max: c.max, pend: c.pend });
+    const d = draft || (draft = { url: c.url, secret: c.secret, label: c.label || bd.name, mode: c.mode, rej: c.rej, max: c.max, pend: c.pend, every: every() / 1000 });
     const ago = ST.last ? Math.max(0, Math.round((Date.now() - ST.last) / 1000)) + ' dtk lalu' : '–';
     pn.innerHTML = '<div class="panel"><div class="hd"><div class="logo">MG</div><div style="min-width:0"><h3>ID → Buku</h3><small>' + (bd.name ? '<b style="color:#0a8a5f">' + esc(bd.name) + '</b> · ' : '') + esc(H) + '</small></div><button class="x" data-a="resetpos" title="Kembalikan pil ke pojok kiri bawah" style="margin-left:auto;margin-right:6px;width:auto;padding:0 9px;font:700 10.5px Nunito,system-ui">Reset posisi</button><button class="x" style="margin-left:0" data-a="close" title="Tutup">✕</button></div>'
       + '<div class="stats"><div class="st g"><b id="v-fill">' + ST.filled + '</b><span>Terisi</span></div><div class="st y"><b id="v-wait">' + ST.waiting + '</b><span>Menunggu</span></div><div class="st"><b id="v-done">' + ST.done + '</b><span>Confirm</span></div></div>'
@@ -153,18 +154,19 @@
       + '<div class="sec">Sambungan (semua situs)</div>'
       + '<div class="f"><label>Link tujuan</label><input type="text" data-k="url" value="' + esc(d.url) + '" placeholder="http://127.0.0.1:8765/bo"><small>Dari aplikasi: Buku → Sambungkan BO. Atau link Apps Script (/exec) untuk Google Sheet.</small></div>'
       + '<div class="f"><label>Kode rahasia</label><input type="password" data-k="secret" value="' + esc(d.secret) + '" placeholder="kode dari aplikasi"></div>'
+      + '<div class="f"><label>Baca tabel tiap (detik)</label><input type="number" data-k="every" value="' + esc(d.every) + '" min="3" max="60"><small>3–60. Selain itu, tabel langsung dibaca saat aplikasi dapat deposit baru atau tabel BO berubah.</small></div>'
       + '<div class="sec">Situs ini</div>'
       + '<div class="f"><label>Nama rekening</label><input type="text" data-k="label" value="' + esc(d.label) + '" placeholder="misal VIP555"><small>' + (bd.name && !c.label ? 'Terdeteksi dari logo web: <b>' + esc(bd.name) + '</b>. Simpan kalau benar. ' : '') + 'Kosongkan kalau BO ini tidak memakai rekening myBCA ini: script mati di situs ini.</small></div>'
       + '<div class="f"><label>Auto confirm deposit</label><div class="seg">' + [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']].map(([v, l]) => '<button data-a="mode" data-v="' + v + '" class="' + (d.mode === v ? 'on' + (v === 'on' ? ' danger' : '') : '') + '">' + l + '</button>').join('') + '</div>'
       + '<small>' + (d.mode === 'off' ? 'Hanya mengisi User ID dan Deposit ID (khusus Bank / BCA).' : d.mode === 'tandai' ? 'Menandai baris yang AKAN di-confirm, tanpa menekan apa pun. Pakai ini dulu.' : '') + '</small>'
       + (d.mode === 'on' ? '<div class="warn"><b>Hati-hati:</b> script akan menekan Confirm sendiri pada deposit yang cocok. Pastikan sudah menjalankan mode Tandai dan hasilnya benar.</div>' : '') + '</div>'
       + '<div class="f"><label>Auto reject deposit</label><div class="seg">' + [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']].map(([v, l]) => '<button data-a="rej" data-v="' + v + '" class="' + (d.rej === v ? 'on' + (v === 'on' ? ' danger' : '') : '') + '">' + l + '</button>').join('') + '</div>'
-      + '<small>' + (d.rej === 'tandai' ? 'Menandai baris yang AKAN di-reject beserta alasannya, tanpa menekan apa pun.' : d.rej === 'on' ? '' : 'Reject: nominal beda, nama beda jelas, atau tanpa bukti (setelah 2 menit). E-wallet tidak disentuh.') + '</small>'
+      + '<small>' + (d.rej === 'tandai' ? 'Menandai baris yang AKAN di-reject beserta alasannya, tanpa menekan apa pun.' : d.rej === 'on' ? '' : 'Reject: nominal beda, nama beda jelas, atau tanpa bukti, setelah masa tunggu (atur di aplikasi: Pengaturan > Auto reject). E-wallet tidak disentuh.') + '</small>'
       + (d.rej === 'on' ? '<div class="warn"><b>Hati-hati:</b> script akan me-reject deposit sendiri. Jalankan mode Tandai dulu dan cek tanda merahnya benar.</div>' : '') + '</div>'
       + (d.mode !== 'off' ? '<div class="f"><label>Batas nominal (Rp)</label><input type="number" data-k="max" value="' + esc(d.max) + '" min="0"><small>Di atas ini tidak di-confirm otomatis.</small></div>'
         + '<div class="f row2"><div class="grow"><label style="margin:0">Boleh saat masih PEND</label><small>Mati = tunggu sampai sudah posting di myBCA (lebih aman).</small></div><button class="sw' + (d.pend ? ' on' : '') + '" data-a="pend"></button></div>' : '')
       + '<div class="btns"><button class="b" data-a="test">Tes koneksi</button><button class="b p' + (d.mode === 'on' ? ' danger' : '') + '" data-a="save">' + (d.mode === 'on' ? 'Aktifkan' : 'Simpan') + '</button></div>'
-      + '<div class="ft" id="ft">Membaca tabel deposit tiap 10 detik</div></div>';
+      + '<div class="ft" id="ft">Membaca tabel tiap ' + (every() / 1000) + ' detik · langsung saat ada deposit baru</div></div>';
     const np = pn.querySelector('.panel'); if (np) np.scrollTop = keep;
   }
   // pil bisa digeser (posisi diingat), klik tanpa geser = buka/tutup panel
@@ -215,6 +217,7 @@
     if (act === 'save') {
       GM_setValue('url', String(draft.url || '').trim()); GM_setValue('secret', String(draft.secret || '').trim()); GM_setValue('label@' + H, String(draft.label || '').trim());
       GM_setValue('mode@' + H, draft.mode); GM_setValue('rej@' + H, draft.rej || 'off'); GM_setValue('max@' + H, Number(String(draft.max).replace(/\D/g, '')) || 5000000); GM_setValue('pend@' + H, !!draft.pend);
+      GM_setValue('every', Math.min(60, Math.max(3, Number(String(draft.every).replace(/\D/g, '')) || 10)));
       draft = null; open = false; root.getElementById('pn').innerHTML = ''; status('tersimpan'); scan();
     }
   }
@@ -262,8 +265,10 @@
     return null;
   }
 
+  let DEAD = [];      // deposit yang di-reject / dibatalkan di BO (oleh staff atau script): pasangan banknya dilepas
   function parseRows() {
     const f = findTable(); if (!f) return null;
+    DEAD = [];
     const I = {}; Object.keys(COLS).forEach((k) => { I[k] = colIdx(f.ths, k); });
     const out = [];
     f.t.querySelectorAll('tbody tr').forEach((tr) => {
@@ -280,11 +285,14 @@
       const user = lines(td[I.user]).filter((x) => !BADGES.test(x))[0] || '';
       const name = I.name >= 0 ? (lines(td[I.name])[0] || '').split(' / ')[0].trim() : '';
       const m = (I.date >= 0 ? td[I.date].innerText : '').match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/) || [];
-      const when = m[1] ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : 0;
+      const boWhen = m[1] ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : 0;   // jam menurut BO (zona BO bisa beda dengan PC)
+      const when = boWhen ? boWhen + skew() : 0;
       if (!(txid && user && (!when || Date.now() - when < MAX_AGE))) return;
       const first = (I.status >= 0 ? lines(td[I.status])[0] : '') || '';      // "qrishoki in progress" TIDAK sama dengan "In Progress"
+      const inProg = /^in\s*progr?ess$/i.test(first);
+      if (!inProg && /reject|cancel|fail|declin|tolak|batal|gagal|expire/i.test(first)) { DEAD.push({ txid, user, amount: Math.round(credit) }); return; }   // deposit gagal: tidak boleh memakai transfer siapa pun
       const link = tr.querySelector('a.confirm-link');
-      out.push({ txid, user, name, amount: Math.round(credit), fund, inProg: /^in\s*progr?ess$/i.test(first),
+      out.push({ txid, user, name, amount: Math.round(credit), fund, inProg, boWhen,
                  href: link ? (link.getAttribute('href') || '') : '', tr, cell: td[I.user], wallet, when,
                  noReceipt: I.receipt >= 0 ? !!td[I.receipt].querySelector('.btn-danger .fa-times, .btn-danger .fa-xmark, a.btn-danger') && !/view/i.test(td[I.receipt].innerText) : false,
                  rejUrl: (tr.querySelector('a.rejectSingle[data-url*="/reject/' + txid + '"]') || {}).dataset ? tr.querySelector('a.rejectSingle[data-url*="/reject/' + txid + '"]').dataset.url : '' });
@@ -298,13 +306,34 @@
       GM_xmlhttpRequest({
         method: 'POST', url: c.url, timeout: 30000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         data: JSON.stringify({ secret: c.secret, rows }),
-        onload: (r) => { let j; try { j = JSON.parse(r.responseText); } catch (e) { reject('balasan bukan dari aplikasi / Apps Script, cek link'); return; } j.ok ? resolve(j) : reject(String(j.error || 'ditolak')); },
+        onload: (r) => { let j; try { j = JSON.parse(r.responseText); } catch (e) { reject('balasan bukan dari aplikasi / Apps Script, cek link'); return; } if (j.ok && j.rev != null) lastRev = j.rev; j.ok ? resolve(j) : reject(String(j.error || 'ditolak')); },
         onerror: () => reject('gagal terhubung'), ontimeout: () => reject('timeout'),
       });
     });
   }
 
   const load = (k) => { try { return JSON.parse(GM_getValue(k, '{}')); } catch (e) { return {}; } };
+  // Selisih jam BO vs PC (kelipatan jam). Dipelajari dari deposit yang baru muncul saat script sedang jalan.
+  const skew = () => Number(GM_getValue('skew@' + H, 0)) || 0;
+  function learnSkew(d) {
+    const h = Math.round(d / 3600e3);
+    if (Math.abs(h) <= 3 && Math.abs(d - h * 3600e3) < 20 * 60e3 && h * 3600e3 !== skew()) GM_setValue('skew@' + H, h * 3600e3);
+  }
+  // Kapan script PERTAMA kali melihat tiap deposit (jam PC). Dipakai untuk masa tunggu reject, jadi tidak tergantung jam BO.
+  function stampSeen(rows) {
+    const seen = load('seen@' + H), now = Date.now();
+    const live = now - (Number(GM_getValue('last@' + H, 0)) || 0) < 60e3;     // script jalan terus (scan terakhir < 1 menit lalu)
+    rows.forEach((r) => { if (!seen[r.txid]) { seen[r.txid] = now; if (live && r.boWhen) learnSkew(now - r.boWhen); } r.seenAt = seen[r.txid]; });
+    rows.forEach((r) => { r.when = r.boWhen ? r.boWhen + skew() : 0; });
+    save('seen@' + H, seen); GM_setValue('last@' + H, now);
+  }
+  const toMatch = (r, c) => ({ kind: 'match', txid: r.txid, user: r.user, name: r.name, amount: r.amount, label: c.label, when: r.when || r.seenAt, done: !r.inProg, tzo: new Date().getTimezoneOffset() });
+  function takeResults(j, dec, conf) {
+    (j.results || []).forEach((x) => {
+      if (x.matched) dec[String(x.txid)] = { sure: !!x.sure, pend: !!x.pend, confirmed: !!x.confirmed || !!conf[x.txid] };
+      else if (x.matched === false && dec[String(x.txid)] && !dec[String(x.txid)].confirmed) delete dec[String(x.txid)];   // pasangan dilepas di aplikasi
+    });
+  }
   const save = (k, o) => { const keys = Object.keys(o); if (keys.length > 3000) keys.slice(0, keys.length - 3000).forEach((x) => delete o[x]); GM_setValue(k, JSON.stringify(o)); };
 
   // ---------------- auto confirm ----------------
@@ -370,27 +399,33 @@
     return (p.ok && (j.s === 'success' || j.status === 'success' || j.success === true)) ? '' : 'ditolak server: ' + (j.m || j.message || '');
   }
 
-  let busy = false;
+  let busy = false, rerun = false, lastRev = null;
   async function scan() {
     const c = cfg();
     if (!c.url) { status('klik untuk mengatur', true); return; }
     if (!c.label) { status('mati di situs ini (nama tab kosong). Klik untuk mengatur'); return; }
-    if (busy) return; busy = true; ST.scanning = true; render();
+    if (busy) { rerun = true; return; } busy = true; ST.scanning = true; render();
     try {
+      watchTable();
       const rows = parseRows();
       if (rows === null) { status('tabel transaksi tidak ada di halaman ini'); return; }
+      stampSeen(rows);
       const dec = load('dec@' + H), conf = load('conf@' + H);
 
-      // 1) isi TID + User ID ke Sheet untuk yang belum cocok
-      const todo = rows.filter((r) => !dec[r.txid]).map((r) => ({ kind: 'match', txid: r.txid, user: r.user, name: r.name, amount: r.amount, label: c.label }));
-      if (todo.length) {
-        const j = await post(c, todo);
-        (j.results || []).forEach((x) => { if (x.matched) dec[String(x.txid)] = { sure: !!x.sure, pend: !!x.pend, confirmed: !!x.confirmed || !!conf[x.txid] }; });
-        save('dec@' + H, dec);
-      } else {
-        // keputusan lama masih bisa berubah (misal PEND sudah posting): segarkan yang belum di-confirm
-        const again = rows.filter((r) => dec[r.txid] && !dec[r.txid].confirmed && !conf[r.txid]).map((r) => ({ kind: 'match', txid: r.txid, user: r.user, name: r.name, amount: r.amount, label: c.label }));
-        if (again.length) { const j = await post(c, again); (j.results || []).forEach((x) => { if (x.matched) dec[String(x.txid)] = { sure: !!x.sure, pend: !!x.pend, confirmed: !!x.confirmed || !!conf[x.txid] }; }); save('dec@' + H, dec); }
+      // 0) deposit yang sudah di-reject / dibatalkan di BO tapi masih memegang baris bank: lepaskan, supaya deposit lain bisa memakainya
+      const rel = DEAD.filter((d) => dec[d.txid] && !dec[d.txid].confirmed && !conf[d.txid]);
+      if (rel.length) {
+        await post(c, rel.map((d) => ({ kind: 'released', txid: d.txid, user: d.user, amount: d.amount, label: c.label })));
+        rel.forEach((d) => { delete dec[d.txid]; }); save('dec@' + H, dec);
+      }
+
+      // 1) isi TID + User ID. In Progress yang belum di-confirm dikirim TIAP scan (status PEND / yakin bisa berubah);
+      //    deposit yang sudah selesai (approved) cukup sekali dan hanya diisi kalau nama yakin cocok. Yang rejected tidak dikirim.
+      const pick = rows.filter((r) => r.inProg ? !(dec[r.txid] && dec[r.txid].confirmed) && !conf[r.txid] : !dec[r.txid])
+        .sort((a, b) => (a.when || a.seenAt) - (b.when || b.seenAt));      // deposit paling lama dipasangkan duluan
+      if (pick.length) {
+        const j = await post(c, pick.map((r) => toMatch(r, c)));
+        takeResults(j, dec, conf); save('dec@' + H, dec);
       }
       const filled = rows.filter((r) => dec[r.txid]).length;
       rows.forEach((r) => mark(r, dec[r.txid] ? ((dec[r.txid].confirmed || conf[r.txid]) ? 'done' : 'ok') : null));
@@ -402,14 +437,17 @@
         for (const r of rows) {
           const d = dec[r.txid]; if (!d || d.confirmed || conf[r.txid]) continue;
           const same = prog.filter((x) => x.amount === r.amount).length;
-          const w = why(r, d, c, same);
+          // member yang sama baru saja punya deposit nominal sama yang sudah approved: bisa jadi transfer lama dipakai dua kali
+          const twin = rows.some((x) => !x.inProg && x.user === r.user && x.amount === r.amount && x.txid !== r.txid && Math.abs((x.when || x.seenAt) - (r.when || r.seenAt)) < 3 * 3600e3);
+          const w = twin ? 'user sama baru saja deposit nominal sama (approved), cek manual' : why(r, d, c, same);
           if (w) { if (r.inProg && d) notes.push(r.amount.toLocaleString('id-ID') + ': ' + w); continue; }
           ready++;
           if (c.mode === 'tandai') { mark(r, 'soon'); continue; }
           if (done >= MAX_CONFIRM_PER_SCAN) continue;
-          conf[r.txid] = Date.now(); save('conf@' + H, conf);              // tandai dulu supaya tidak pernah dobel
+          const fresh = load('conf@' + H); if (fresh[r.txid]) { conf[r.txid] = fresh[r.txid]; continue; }   // tab BO lain sudah meng-confirm
+          conf[r.txid] = Date.now(); fresh[r.txid] = conf[r.txid]; save('conf@' + H, fresh);              // tandai dulu supaya tidak pernah dobel
           const err = await confirmOne(r);
-          if (err) { delete conf[r.txid]; save('conf@' + H, conf); notes.push('gagal confirm ' + r.amount.toLocaleString('id-ID') + ': ' + err); continue; }
+          if (err) { delete conf[r.txid]; const f2 = load('conf@' + H); delete f2[r.txid]; save('conf@' + H, f2); notes.push('gagal confirm ' + r.amount.toLocaleString('id-ID') + ': ' + err); continue; }
           done++; dec[r.txid].confirmed = true; save('dec@' + H, dec);
           mark(r, 'done');
           try { await post(c, [{ kind: 'confirmed', txid: r.txid, user: r.user, name: r.name, amount: r.amount, label: c.label }]); } catch (e) { /* tidak fatal */ }
@@ -419,9 +457,9 @@
       let rejNow = 0, rejSoon = 0;
       if (c.rej !== 'off') {
         const rejd = load('rejd@' + H);
-        const cand = rows.filter((r) => r.inProg && !r.wallet && isBCA(r.fund) && r.rejUrl && r.when && !rejd[r.txid] && !conf[r.txid] && !(dec[r.txid] && dec[r.txid].confirmed));
+        const cand = rows.filter((r) => r.inProg && !r.wallet && isBCA(r.fund) && r.rejUrl && (r.when || r.seenAt) && !rejd[r.txid] && !conf[r.txid] && !(dec[r.txid] && dec[r.txid].confirmed));
         if (cand.length) {
-          const j = await post(c, cand.map((r) => ({ kind: 'judge', txid: r.txid, name: r.name, amount: r.amount, bornAt: r.when, noReceipt: r.noReceipt })));
+          const j = await post(c, cand.map((r) => ({ kind: 'judge', txid: r.txid, name: r.name, amount: r.amount, bornAt: r.when, seenAt: r.seenAt, noReceipt: r.noReceipt })));
           const vd = j.verdicts || {};
           for (const r of cand) {
             const v = vd[r.txid]; if (!v) continue;
@@ -443,12 +481,36 @@
       if (rejNow) notes.unshift(rejNow + ' deposit di-reject barusan');
       status(c.mode === 'tandai' ? 'Siap confirm: ' + ready + ' (mode Tandai, belum menekan apa pun)' : c.mode === 'on' ? done + ' di-confirm barusan, auto confirm aktif' : 'Berjalan normal');
     } catch (e) { status(String(e), true); }
-    finally { busy = false; ST.scanning = false; render(); }
+    finally { busy = false; ST.scanning = false; render(); if (rerun) { rerun = false; setTimeout(scan, 300); } }
+  }
+
+  // ---------------- deteksi cepat ----------------
+  // a) tabel BO berubah (deposit baru masuk lewat ajax / refresh tabel) -> baca langsung
+  let mo = null, moT = 0;
+  const isMine = (n) => !!n && (n.nodeType === 1 ? !!n.closest('.mg-chip') : !!(n.parentElement && n.parentElement.closest('.mg-chip')));
+  const ownMut = (m) => isMine(m.target) || (m.type === 'childList' && (m.addedNodes.length + m.removedNodes.length) > 0 && [...m.addedNodes, ...m.removedNodes].every(isMine));
+  function watchTable() {
+    const f = findTable(); if (!f || (mo && mo._t === f.t)) return;
+    if (mo) mo.disconnect();
+    mo = new MutationObserver((ms) => { if (ms.every(ownMut)) return; clearTimeout(moT); moT = setTimeout(scan, 700); });
+    mo.observe(f.t, { childList: true, subtree: true, characterData: true }); mo._t = f.t;
+  }
+  // b) aplikasi baru mencatat deposit (angka rev berubah) -> baca langsung, tidak menunggu interval
+  function pollRev() {
+    const c = cfg();
+    if (!c.label || !/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(c.url || '')) return;   // hanya mode aplikasi (bukan Google Sheet)
+    GM_xmlhttpRequest({ method: 'GET', url: c.url, timeout: 4000, onload: (r) => {
+      let j; try { j = JSON.parse(r.responseText); } catch (e) { return; }
+      if (j.rev == null) return;
+      if (lastRev !== null && j.rev !== lastRev) scan();
+      lastRev = j.rev;
+    } });
   }
 
   // tampil langsung (dengan angka terakhir) walau halaman BO masih memuat atau baru di-refresh
   loadST(); ensureUI(); render();
   const kick = () => setTimeout(scan, 1200);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', kick); else kick();
-  setInterval(scan, EVERY);
+  (function loop() { setTimeout(() => { scan(); loop(); }, every()); })();
+  setInterval(pollRev, FAST);
 })();

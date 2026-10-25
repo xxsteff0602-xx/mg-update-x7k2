@@ -1,6 +1,6 @@
 {
-  "version": "2.7",
+  "version": "2.9.1",
+  "notes": "4 tema baru (Langit, Lavender, dan tema gelap Gelap & Malam untuk kerja malam), Jaga Rumus (rumus di buku hitungan tidak hilang saat tempel), tombol Salin kolom, tabel Deposit tidak kedip, Pengaturan lebih rapi, tombol Kembali di Sambung HP.",
   "zip": "update.zip",
-  "sha256": "3686309423e01545088366477b25b4ac4a186c21707cdd69817841b0c5e83d6d",
-  "notes": "Peringatan saldo besar di Beranda (SALDO SUDAH 3 JUTA, TOLONG KIRIM DUITNYA SEKARANG), batas diatur di Pengaturan. Termasuk semua perbaikan keamanan v2.6."
+  "sha256": "112fd9f496d1957e1e246f502fa32e5a5c687db14665c24e70dcdd274ec4af4a"
 }

@@ -1,6 +1,6 @@
 {
- "version": "2.2",
- "zip": "update.zip",
- "sha256": "42df83a314ab362af9f702d60ed6608adae0aa351552691a724f80b7d27c5345",
- "notes": "pilihan tema warna (Awal, Kopi, Samudra, Senja)"
+  "version": "2.7",
+  "zip": "update.zip",
+  "sha256": "3686309423e01545088366477b25b4ac4a186c21707cdd69817841b0c5e83d6d",
+  "notes": "Peringatan saldo besar di Beranda (SALDO SUDAH 3 JUTA, TOLONG KIRIM DUITNYA SEKARANG), batas diatur di Pengaturan. Termasuk semua perbaikan keamanan v2.6."
 }

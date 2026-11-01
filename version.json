@@ -1,6 +1,6 @@
 {
-  "version": "2.9.1",
-  "notes": "4 tema baru (Langit, Lavender, dan tema gelap Gelap & Malam untuk kerja malam), Jaga Rumus (rumus di buku hitungan tidak hilang saat tempel), tombol Salin kolom, tabel Deposit tidak kedip, Pengaturan lebih rapi, tombol Kembali di Sambung HP.",
+  "version": "3.0.7",
+  "notes": "MEGA OFFICE 3.0.7: Cari Selisih - ADD 'kembalikan saldo' yang ternyata WD-nya sukses di Hoki sekarang ketemu (tidak lagi dipasangkan ke WD lama berhari-hari sebelumnya).",
   "zip": "update.zip",
-  "sha256": "112fd9f496d1957e1e246f502fa32e5a5c687db14665c24e70dcdd274ec4af4a"
+  "sha256": "79d0b2f0e74f125f82ea20b51d38ab63d8a10cc5d0b69dff261c0ef442f7f9e3"
 }

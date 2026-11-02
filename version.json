@@ -1,6 +1,6 @@
 {
-  "version": "3.0.7",
-  "notes": "MEGA OFFICE 3.0.7: Cari Selisih - ADD 'kembalikan saldo' yang ternyata WD-nya sukses di Hoki sekarang ketemu (tidak lagi dipasangkan ke WD lama berhari-hari sebelumnya).",
+  "version": "3.0.11",
+  "notes": "MEGA OFFICE 3.0.11: menu baru Cek Coin Error, jam/tanggal/shift WIB + Armenia, ganti username sendiri, tampilan Cek Rekening baru, perbaikan Cari Selisih.",
   "zip": "update.zip",
-  "sha256": "79d0b2f0e74f125f82ea20b51d38ab63d8a10cc5d0b69dff261c0ef442f7f9e3"
+  "sha256": "9cb80b3c4bf8da5510916a67504899a9ad1e0bfcc0b2bfadd2e34830bf299509"
 }

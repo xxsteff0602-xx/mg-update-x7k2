@@ -1,6 +1,6 @@
 {
-  "version": "3.0.11",
-  "notes": "MEGA OFFICE 3.0.11: menu baru Cek Coin Error, jam/tanggal/shift WIB + Armenia, ganti username sendiri, tampilan Cek Rekening baru, perbaikan Cari Selisih.",
+  "version": "3.0.14",
+  "notes": "MEGA OFFICE 3.0.14: perbaikan Cari Selisih (WD belum sukses, baris sesudah gross terakhir, ADD koreksi hari sebelumnya).",
   "zip": "update.zip",
-  "sha256": "9cb80b3c4bf8da5510916a67504899a9ad1e0bfcc0b2bfadd2e34830bf299509"
+  "sha256": "197bb57650152dd14f1bf95265d9c65b770ff25de918bc4e53dd6e43fe065bc8"
 }

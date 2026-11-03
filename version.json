@@ -1,6 +1,6 @@
 {
-  "version": "3.0.16",
-  "notes": "MEGA OFFICE 3.0.16: tema gelap Gold Night (menu Account > Tampilan gelap), sidebar baru yang bisa disembunyikan.",
+  "version": "3.0.17",
+  "notes": "MEGA OFFICE 3.0.17: Terang/Gelap, Lock dan menu akun (Info akun, Ganti username, Ganti sandi, Sign out) pindah ke kanan atas; sidebar lebih lega.",
   "zip": "update.zip",
-  "sha256": "f477630e0298a9101eb28c528a72b3cf2eb9c72f2f8f31906e82bba29d6fe8e6"
+  "sha256": "851399466626b3038e18c8160945212d8cec9cccd2b05d639c482dca391b4324"
 }

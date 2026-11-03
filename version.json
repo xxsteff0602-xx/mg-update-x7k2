@@ -1,6 +1,6 @@
 {
-  "version": "3.0.15",
-  "notes": "MEGA OFFICE 3.0.15: layar loading saat buka aplikasi/login, akses Cek Coin Error terpisah, panel akun staff bisa di-scroll, perbaikan Cari Selisih.",
+  "version": "3.0.16",
+  "notes": "MEGA OFFICE 3.0.16: tema gelap Gold Night (menu Account > Tampilan gelap), sidebar baru yang bisa disembunyikan.",
   "zip": "update.zip",
-  "sha256": "c4f2d8c683277a7f6b84379e9768416d23c151120b4df22557bbbfb2cdf4064c"
+  "sha256": "f477630e0298a9101eb28c528a72b3cf2eb9c72f2f8f31906e82bba29d6fe8e6"
 }

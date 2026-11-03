@@ -1,6 +1,6 @@
 {
-  "version": "3.0.17",
-  "notes": "MEGA OFFICE 3.0.17: Terang/Gelap, Lock dan menu akun (Info akun, Ganti username, Ganti sandi, Sign out) pindah ke kanan atas; sidebar lebih lega.",
+  "version": "3.0.18",
+  "notes": "MEGA OFFICE 3.0.18: Cari Selisih mengenali nama user yang masuk kolom CS, deposit NETZ yang coin-nya lewat ADD, dan baris tambahan coin di gross tanggal depan.",
   "zip": "update.zip",
-  "sha256": "851399466626b3038e18c8160945212d8cec9cccd2b05d639c482dca391b4324"
+  "sha256": "eaa31511f6986607b946d3ec03412bcdc905c4f0649182f0fa5d54b67899d1ae"
 }

@@ -1,6 +1,6 @@
 {
-  "version": "3.0.19",
-  "notes": "MEGA OFFICE 3.0.19: Cari Selisih menemukan baris dobel (ID transaksi milik user lain) dan tidak lagi salah membaca adjust deposit QRIS.",
+  "version": "3.0.20",
+  "notes": "MEGA OFFICE 3.0.20: Cari Selisih menemukan WD yang di-confirm manual (bukan lewat Hoki) tapi belum dicatat di buku.",
   "zip": "update.zip",
-  "sha256": "ac6c15b68e7ab6c19ba73a19d521d03d58f52079ac969887f3415911547260db"
+  "sha256": "73fcaeb00c723c808295f9533b6114aee4a623df12a9b19877777c6829827588"
 }

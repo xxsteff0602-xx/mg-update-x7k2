@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         MEGA GAMING - Isi TID + User ID ke Sheet & Auto Confirm Deposit
 // @namespace    mega-gaming
-// @version      3.8
+// @version      3.9
 // @updateURL    https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @downloadURL  https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
-// @description  Baca deposit di BO (semua domain panel UG / GIGA), isi Username + Transaction ID ke Buku di aplikasi MEGA GAMING (atau Google Sheet), dicocokkan dengan nama pengirim myBCA, dan opsional auto confirm deposit yang cocok.
+// @description  Baca deposit di BO (semua domain panel UG / GIGA), isi Username + Transaction ID ke Buku di aplikasi MEGA GAMING / BCA Depo Auto versi web (atau Google Sheet), dicocokkan dengan nama pengirim myBCA, dan opsional auto confirm deposit yang cocok.
 // @include      *
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_listValues
+// @grant        GM_deleteValue
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // @connect      127.0.0.1
@@ -18,6 +20,33 @@
 // ==/UserScript==
 (function () {
   'use strict';
+  const kunci = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // ---------------- jembatan ke BCA Depo Auto versi web (halaman /bca/ di MEGA OFFICE) ----------------
+  // Tab BO menaruh permintaan di penyimpanan Tampermonkey (mgreq@<situs>), script ini di tab /bca/ meneruskannya ke halaman
+  // lewat postMessage, lalu menaruh jawabannya di mgres@<situs>. Halaman /bca/ juga mengumumkan rev buku (mgweb@<website>).
+  if (/^\/bca(\/|$)/.test(location.pathname) && (/mega-office/i.test(location.hostname) || /^(127\.0\.0\.1|localhost)$/.test(location.hostname))) {
+    if (window.top !== window.self) return;
+    let web = '', alive = false; const pend = {};
+    window.addEventListener('message', (ev) => {
+      if (ev.source !== window) return; const d = ev.data; if (!d || d.tag !== 'mg-bo') return;
+      if (d.op === 'hello') { web = String(d.web || ''); alive = true; GM_setValue('mgweb@' + kunci(web), JSON.stringify({ rev: d.rev, t: Date.now() })); window.postMessage({ tag: 'mg-bo', op: 'relay', v: '3.9' }, location.origin); }
+      if (d.op === 'res' && pend[d.id]) { GM_setValue('mgres@' + pend[d.id], JSON.stringify({ id: d.id, res: d.res })); delete pend[d.id]; }
+    });
+    setInterval(() => {
+      if (!alive) return;
+      for (const k of GM_listValues()) {
+        if (!k.startsWith('mgreq@')) continue;
+        let q; try { q = JSON.parse(GM_getValue(k, 'null')); } catch (e) { q = null; }
+        if (!q || !q.id) continue;
+        if (Date.now() - q.t > 60000) { GM_deleteValue(k); continue; }
+        if (q.label && kunci(q.label) !== kunci(web)) continue;          // untuk halaman website lain
+        if (pend[q.id]) continue;
+        pend[q.id] = k.slice(6); GM_deleteValue(k);
+        window.postMessage({ tag: 'mg-bo', op: 'req', id: q.id, body: q.body }, location.origin);
+      }
+    }, 250);
+    return;
+  }
   // Domain panel sering ganti, jadi @include * dipakai. Di luar domain yang ada kata "admin"/"backoffice"
   // script langsung berhenti. Hanya jalan di halaman utama, bukan iframe.
   if (!/admin|backoffice/i.test(location.hostname) || window.top !== window.self) return;
@@ -152,7 +181,7 @@
       + '<div class="msg' + (ST.bad ? ' bad' : '') + '" id="v-msg">' + esc(ST.msg) + ' · ' + ago + '</div>'
       + '<ul class="notes" id="v-notes">' + ST.notes.slice(0, 4).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>'
       + '<div class="sec">Sambungan (semua situs)</div>'
-      + '<div class="f"><label>Link tujuan</label><input type="text" data-k="url" value="' + esc(d.url) + '" placeholder="http://127.0.0.1:8765/bo"><small>Dari aplikasi: Buku → Sambungkan BO. Atau link Apps Script (/exec) untuk Google Sheet.</small></div>'
+      + '<div class="f"><label>Link tujuan</label><input type="text" data-k="url" value="' + esc(d.url) + '" placeholder="web  atau  http://127.0.0.1:8765/bo"><small>Isi <b>web</b> untuk BCA Depo Auto versi web (MEGA OFFICE). Aplikasi PC: Buku → Sambungkan BO. Atau link Apps Script (/exec) untuk Google Sheet.</small></div>'
       + '<div class="f"><label>Kode rahasia</label><input type="password" data-k="secret" value="' + esc(d.secret) + '" placeholder="kode dari aplikasi"></div>'
       + '<div class="f"><label>Baca tabel tiap (detik)</label><input type="number" data-k="every" value="' + esc(d.every) + '" min="3" max="60"><small>3–60. Selain itu, tabel langsung dibaca saat aplikasi dapat deposit baru atau tabel BO berubah.</small></div>'
       + '<div class="sec">Situs ini</div>'
@@ -301,7 +330,31 @@
   }
 
   // ---------------- kirim ke Sheet ----------------
+  const isWeb = (u) => /^web$/i.test(String(u || '').trim());
+  function postWeb(c, rows) {
+    return new Promise((resolve, reject) => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      const slot = H + (rows.length ? '' : '#t');
+      const lab = (rows.find((r) => r.label) || {}).label || '';
+      GM_deleteValue('mgres@' + slot);
+      GM_setValue('mgreq@' + slot, JSON.stringify({ id, t: Date.now(), label: lab, body: { secret: c.secret, rows } }));
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        let r; try { r = JSON.parse(GM_getValue('mgres@' + slot, 'null')); } catch (e) { r = null; }
+        if (r && r.id === id) {
+          clearInterval(iv); GM_deleteValue('mgres@' + slot);
+          const j = r.res || {}; if (j.ok && j.rev != null) lastRev = j.rev; j.ok ? resolve(j) : reject(String(j.error || 'ditolak')); return;
+        }
+        if (Date.now() - t0 > 20000) {
+          clearInterval(iv); GM_deleteValue('mgreq@' + slot);
+          let w = null; try { w = JSON.parse(GM_getValue('mgweb@' + kunci(lab || cfg().label), 'null')); } catch (e) { w = null; }
+          reject(!w || Date.now() - w.t > 15000 ? 'halaman BCA Depo Auto (web)' + (lab ? ' untuk ' + lab : '') + ' belum dibuka di browser ini' : 'halaman BCA Depo Auto (web) tidak menjawab, refresh halamannya');
+        }
+      }, 200);
+    });
+  }
   function post(c, rows) {
+    if (isWeb(c.url)) return postWeb(c, rows);
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
         method: 'POST', url: c.url, timeout: 30000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -498,6 +551,12 @@
   // b) aplikasi baru mencatat deposit (angka rev berubah) -> baca langsung, tidak menunggu interval
   function pollRev() {
     const c = cfg();
+    if (c.label && isWeb(c.url)) {                                     // versi web: rev diumumkan halaman /bca/ lewat penyimpanan Tampermonkey
+      let w = null; try { w = JSON.parse(GM_getValue('mgweb@' + kunci(c.label), 'null')); } catch (e) { w = null; }
+      if (!w || w.rev == null || Date.now() - w.t > 15000) return;
+      if (lastRev !== null && w.rev !== lastRev) scan();
+      lastRev = w.rev; return;
+    }
     if (!c.label || !/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(c.url || '')) return;   // hanya mode aplikasi (bukan Google Sheet)
     GM_xmlhttpRequest({ method: 'GET', url: c.url, timeout: 4000, onload: (r) => {
       let j; try { j = JSON.parse(r.responseText); } catch (e) { return; }

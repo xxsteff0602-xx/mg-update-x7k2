@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEGA GAMING - Isi TID + User ID ke Sheet & Auto Confirm Deposit
 // @namespace    mega-gaming
-// @version      3.9
+// @version      4.0
 // @updateURL    https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @downloadURL  https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @description  Baca deposit di BO (semua domain panel UG / GIGA), isi Username + Transaction ID ke Buku di aplikasi MEGA GAMING / BCA Depo Auto versi web (atau Google Sheet), dicocokkan dengan nama pengirim myBCA, dan opsional auto confirm deposit yang cocok.
@@ -29,7 +29,12 @@
     let web = '', alive = false; const pend = {};
     window.addEventListener('message', (ev) => {
       if (ev.source !== window) return; const d = ev.data; if (!d || d.tag !== 'mg-bo') return;
-      if (d.op === 'hello') { web = String(d.web || ''); alive = true; GM_setValue('mgweb@' + kunci(web), JSON.stringify({ rev: d.rev, t: Date.now() })); window.postMessage({ tag: 'mg-bo', op: 'relay', v: '3.9' }, location.origin); }
+      if (d.op === 'hello') {
+        web = String(d.web || ''); alive = true;
+        GM_setValue('mgweb@' + kunci(web), JSON.stringify({ rev: d.rev, t: Date.now(), web, secret: String(d.secret || '') }));
+        let st = null; try { st = JSON.parse(GM_getValue('mgbo@' + kunci(web), 'null')); } catch (e) { st = null; }
+        window.postMessage({ tag: 'mg-bo', op: 'relay', v: '4.0', bo: st }, location.origin);
+      }
       if (d.op === 'res' && pend[d.id]) { GM_setValue('mgres@' + pend[d.id], JSON.stringify({ id: d.id, res: d.res })); delete pend[d.id]; }
     });
     setInterval(() => {
@@ -173,28 +178,39 @@
   }
   function panel() {
     const c = cfg(); const pn = root.getElementById('pn'); const old = pn.querySelector('.panel'); const keep = old ? old.scrollTop : 0;
-    const bd = brand();
-    const d = draft || (draft = { url: c.url, secret: c.secret, label: c.label || bd.name, mode: c.mode, rej: c.rej, max: c.max, pend: c.pend, every: every() / 1000 });
+    const bd = brand(); const opened = websOpen();
+    const destOf = (u) => isWeb(u) ? 'web' : /^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(u || '') ? 'app' : u ? 'sheet' : (opened.length ? 'web' : 'app');
+    const d = draft || (draft = { dest: destOf(c.url), url: isWeb(c.url) ? '' : c.url, secret: c.secret, label: c.label || bd.name || (opened.length === 1 ? opened[0].web : ''), mode: c.mode, rej: c.rej, max: c.max, pend: c.pend, every: every() / 1000 });
     const ago = ST.last ? Math.max(0, Math.round((Date.now() - ST.last) / 1000)) + ' dtk lalu' : '–';
+    const seg = (act, cur, items, danger) => '<div class="seg">' + items.map(([v, l]) => '<button data-a="' + act + '" data-v="' + v + '" class="' + (cur === v ? 'on' + (danger && v === 'on' ? ' danger' : '') : '') + '">' + l + '</button>').join('') + '</div>';
+    let dest = '';
+    if (d.dest === 'web') {
+      const w = d.label ? webInfo(d.label) : null;
+      dest = w ? '<div class="msg">✓ Halaman <b>BCA Depo Auto ' + esc(w.web) + '</b> terbuka di browser ini. Kode rahasia diambil otomatis.</div>'
+        : '<div class="warn" style="margin-top:0">' + (d.label ? 'Halaman BCA Depo Auto untuk <b>' + esc(d.label) + '</b> belum terbuka.' : 'Isi nama rekening di langkah 2.') + ' Buka MEGA OFFICE → BCA Depo Auto → Buka versi web, di Chrome yang sama.'
+          + (opened.length ? '<br>Yang terbuka sekarang: ' + opened.map((x) => '<b>' + esc(x.web) + '</b>').join(', ') : '') + '</div>';
+    } else {
+      dest = '<div class="f"><label>' + (d.dest === 'app' ? 'Link aplikasi' : 'Link Apps Script (/exec)') + '</label><input type="text" data-k="url" value="' + esc(d.url) + '" placeholder="' + (d.dest === 'app' ? 'http://127.0.0.1:8765/bo' : 'https://script.google.com/…/exec') + '"><small>' + (d.dest === 'app' ? 'Dari aplikasi PC: Buku → Sambungkan BO.' : 'Untuk buku Google Sheet.') + '</small></div>'
+        + '<div class="f"><label>Kode rahasia</label><input type="password" data-k="secret" value="' + esc(d.secret) + '" placeholder="kode dari aplikasi"></div>';
+    }
     pn.innerHTML = '<div class="panel"><div class="hd"><div class="logo">MG</div><div style="min-width:0"><h3>ID → Buku</h3><small>' + (bd.name ? '<b style="color:#0a8a5f">' + esc(bd.name) + '</b> · ' : '') + esc(H) + '</small></div><button class="x" data-a="resetpos" title="Kembalikan pil ke pojok kiri bawah" style="margin-left:auto;margin-right:6px;width:auto;padding:0 9px;font:700 10.5px Nunito,system-ui">Reset posisi</button><button class="x" style="margin-left:0" data-a="close" title="Tutup">✕</button></div>'
       + '<div class="stats"><div class="st g"><b id="v-fill">' + ST.filled + '</b><span>Terisi</span></div><div class="st y"><b id="v-wait">' + ST.waiting + '</b><span>Menunggu</span></div><div class="st"><b id="v-done">' + ST.done + '</b><span>Confirm</span></div></div>'
       + '<div class="msg' + (ST.bad ? ' bad' : '') + '" id="v-msg">' + esc(ST.msg) + ' · ' + ago + '</div>'
       + '<ul class="notes" id="v-notes">' + ST.notes.slice(0, 4).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>'
-      + '<div class="sec">Sambungan (semua situs)</div>'
-      + '<div class="f"><label>Link tujuan</label><input type="text" data-k="url" value="' + esc(d.url) + '" placeholder="web  atau  http://127.0.0.1:8765/bo"><small>Isi <b>web</b> untuk BCA Depo Auto versi web (MEGA OFFICE). Aplikasi PC: Buku → Sambungkan BO. Atau link Apps Script (/exec) untuk Google Sheet.</small></div>'
-      + '<div class="f"><label>Kode rahasia</label><input type="password" data-k="secret" value="' + esc(d.secret) + '" placeholder="kode dari aplikasi"></div>'
-      + '<div class="f"><label>Baca tabel tiap (detik)</label><input type="number" data-k="every" value="' + esc(d.every) + '" min="3" max="60"><small>3–60. Selain itu, tabel langsung dibaca saat aplikasi dapat deposit baru atau tabel BO berubah.</small></div>'
-      + '<div class="sec">Situs ini</div>'
-      + '<div class="f"><label>Nama rekening</label><input type="text" data-k="label" value="' + esc(d.label) + '" placeholder="misal VIP555"><small>' + (bd.name && !c.label ? 'Terdeteksi dari logo web: <b>' + esc(bd.name) + '</b>. Simpan kalau benar. ' : '') + 'Kosongkan kalau BO ini tidak memakai rekening myBCA ini: script mati di situs ini.</small></div>'
-      + '<div class="f"><label>Auto confirm deposit</label><div class="seg">' + [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']].map(([v, l]) => '<button data-a="mode" data-v="' + v + '" class="' + (d.mode === v ? 'on' + (v === 'on' ? ' danger' : '') : '') + '">' + l + '</button>').join('') + '</div>'
+      + '<div class="sec">1 · Kirim ID ke</div><div class="f">' + seg('dest', d.dest, [['web', 'Web'], ['app', 'Aplikasi PC'], ['sheet', 'Sheet']]) + '<small>' + (d.dest === 'web' ? 'BCA Depo Auto versi web di MEGA OFFICE. Tanpa link dan kode: cukup buka halamannya di Chrome yang sama.' : d.dest === 'app' ? 'Aplikasi MEGA GAMING di PC ini.' : 'Buku Google Sheet lewat Apps Script.') + '</small></div>' + dest
+      + '<div class="sec">2 · Situs ini</div>'
+      + '<div class="f"><label>Nama rekening</label><input type="text" data-k="label" value="' + esc(d.label) + '" placeholder="misal VIP555"><small>' + (bd.name ? 'Terdeteksi dari logo web: <b>' + esc(bd.name) + '</b>. ' : '') + 'Kosongkan kalau BO ini tidak memakai rekening myBCA ini (script mati di situs ini).</small></div>'
+      + '<div class="f"><label>Baca tabel tiap (detik)</label><input type="number" data-k="every" value="' + esc(d.every) + '" min="3" max="60"><small>3–60. Tabel juga langsung dibaca saat ada deposit baru atau tabel BO berubah.</small></div>'
+      + '<div class="sec">3 · Otomatis</div>'
+      + '<div class="f"><label>Auto confirm deposit</label>' + seg('mode', d.mode, [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']], true)
       + '<small>' + (d.mode === 'off' ? 'Hanya mengisi User ID dan Deposit ID (khusus Bank / BCA).' : d.mode === 'tandai' ? 'Menandai baris yang AKAN di-confirm, tanpa menekan apa pun. Pakai ini dulu.' : '') + '</small>'
       + (d.mode === 'on' ? '<div class="warn"><b>Hati-hati:</b> script akan menekan Confirm sendiri pada deposit yang cocok. Pastikan sudah menjalankan mode Tandai dan hasilnya benar.</div>' : '') + '</div>'
-      + '<div class="f"><label>Auto reject deposit</label><div class="seg">' + [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']].map(([v, l]) => '<button data-a="rej" data-v="' + v + '" class="' + (d.rej === v ? 'on' + (v === 'on' ? ' danger' : '') : '') + '">' + l + '</button>').join('') + '</div>'
-      + '<small>' + (d.rej === 'tandai' ? 'Menandai baris yang AKAN di-reject beserta alasannya, tanpa menekan apa pun.' : d.rej === 'on' ? '' : 'Reject: nominal beda, nama beda jelas, atau tanpa bukti, setelah masa tunggu (atur di aplikasi: Pengaturan > Auto reject). E-wallet tidak disentuh.') + '</small>'
+      + '<div class="f"><label>Auto reject deposit</label>' + seg('rej', d.rej, [['off', 'Mati'], ['tandai', 'Tandai'], ['on', 'Otomatis']], true)
+      + '<small>' + (d.rej === 'tandai' ? 'Menandai baris yang AKAN di-reject beserta alasannya, tanpa menekan apa pun.' : d.rej === 'on' ? '' : 'Reject: nominal beda, nama beda jelas, atau tanpa bukti, setelah masa tunggu (diatur di aplikasi / halaman web: Pengaturan > Auto reject). E-wallet tidak disentuh.') + '</small>'
       + (d.rej === 'on' ? '<div class="warn"><b>Hati-hati:</b> script akan me-reject deposit sendiri. Jalankan mode Tandai dulu dan cek tanda merahnya benar.</div>' : '') + '</div>'
-      + (d.mode !== 'off' ? '<div class="f"><label>Batas nominal (Rp)</label><input type="number" data-k="max" value="' + esc(d.max) + '" min="0"><small>Di atas ini tidak di-confirm otomatis.</small></div>'
+      + (d.mode !== 'off' ? '<div class="f"><label>Batas nominal auto confirm (Rp)</label><input type="number" data-k="max" value="' + esc(d.max) + '" min="0"><small>Di atas ini tidak di-confirm otomatis.</small></div>'
         + '<div class="f row2"><div class="grow"><label style="margin:0">Boleh saat masih PEND</label><small>Mati = tunggu sampai sudah posting di myBCA (lebih aman).</small></div><button class="sw' + (d.pend ? ' on' : '') + '" data-a="pend"></button></div>' : '')
-      + '<div class="btns"><button class="b" data-a="test">Tes koneksi</button><button class="b p' + (d.mode === 'on' ? ' danger' : '') + '" data-a="save">' + (d.mode === 'on' ? 'Aktifkan' : 'Simpan') + '</button></div>'
+      + '<div class="btns"><button class="b" data-a="test">Tes koneksi</button><button class="b p' + (d.mode === 'on' || d.rej === 'on' ? ' danger' : '') + '" data-a="save">' + (d.mode === 'on' || d.rej === 'on' ? 'Aktifkan' : 'Simpan') + '</button></div>'
       + '<div class="ft" id="ft">Membaca tabel tiap ' + (every() / 1000) + ' detik · langsung saat ada deposit baru</div></div>';
     const np = pn.querySelector('.panel'); if (np) np.scrollTop = keep;
   }
@@ -235,16 +251,19 @@
     if (act === 'close') { open = false; render(); return; }
     if (act === 'resetpos') { GM_setValue('pos', 'null'); applyPos(); return; }
     if (act === 'rej') { draft.rej = a.dataset.v; panel(); return; }
+    if (act === 'dest') { draft.dest = a.dataset.v; if (draft.dest === 'app' && !draft.url) draft.url = 'http://127.0.0.1:8765/bo'; panel(); return; }
     if (act === 'mode') { draft.mode = a.dataset.v; panel(); return; }
     if (act === 'pend') { draft.pend = !draft.pend; panel(); return; }
     if (act === 'test') {
       const ft = root.getElementById('ft'); ft.textContent = 'Menguji…';
-      try { await post({ url: String(draft.url || '').trim(), secret: String(draft.secret || '').trim() }, []); ft.style.color = '#0a7a52'; ft.textContent = 'Terhubung dan kode rahasia benar'; }
+      const u = draft.dest === 'web' ? 'web' : String(draft.url || '').trim();
+      if (u === 'web' && !webInfo(draft.label)) { ft.style.color = '#b42318'; ft.textContent = 'Halaman BCA Depo Auto ' + (draft.label || '') + ' belum terbuka di browser ini'; return; }
+      try { await post({ url: u, secret: String(draft.secret || '').trim() }, []); ft.style.color = '#0a7a52'; ft.textContent = u === 'web' ? 'Terhubung ke BCA Depo Auto ' + draft.label : 'Terhubung dan kode rahasia benar'; }
       catch (err) { ft.style.color = '#b42318'; ft.textContent = 'Gagal: ' + err; }
       return;
     }
     if (act === 'save') {
-      GM_setValue('url', String(draft.url || '').trim()); GM_setValue('secret', String(draft.secret || '').trim()); GM_setValue('label@' + H, String(draft.label || '').trim());
+      GM_setValue('url', draft.dest === 'web' ? 'web' : String(draft.url || '').trim()); if (draft.dest !== 'web') GM_setValue('secret', String(draft.secret || '').trim()); GM_setValue('label@' + H, draft.dest === 'web' ? String(draft.label || '').trim().toUpperCase() : String(draft.label || '').trim());
       GM_setValue('mode@' + H, draft.mode); GM_setValue('rej@' + H, draft.rej || 'off'); GM_setValue('max@' + H, Number(String(draft.max).replace(/\D/g, '')) || 5000000); GM_setValue('pend@' + H, !!draft.pend);
       GM_setValue('every', Math.min(60, Math.max(3, Number(String(draft.every).replace(/\D/g, '')) || 10)));
       draft = null; open = false; root.getElementById('pn').innerHTML = ''; status('tersimpan'); scan();
@@ -254,7 +273,13 @@
   GM_registerMenuCommand('Buka panel MEGA GAMING', openPanel);
 
   // status dari scan -> tampilan
-  function saveST() { try { GM_setValue('st@' + H, JSON.stringify({ filled: ST.filled, waiting: ST.waiting, done: ST.done, msg: ST.msg, bad: ST.bad, notes: ST.notes, last: ST.last })); } catch (e) { /* abaikan */ } }
+  function saveST() {
+    try {
+      GM_setValue('st@' + H, JSON.stringify({ filled: ST.filled, waiting: ST.waiting, done: ST.done, msg: ST.msg, bad: ST.bad, notes: ST.notes, last: ST.last }));
+      const c = cfg();
+      if (isWeb(c.url) && c.label) GM_setValue('mgbo@' + kunci(c.label), JSON.stringify({ host: H, mode: c.mode, rej: c.rej, max: c.max, filled: ST.filled, waiting: ST.waiting, done: ST.done, msg: ST.msg, bad: ST.bad, notes: ST.notes.slice(0, 6), last: ST.last, v: '4.0' }));
+    } catch (e) { /* abaikan */ }
+  }
   function loadST() { try { Object.assign(ST, JSON.parse(GM_getValue('st@' + H, '{}'))); ST.scanning = false; } catch (e) { /* abaikan */ } }
   function status(t, bad) { ST.msg = t; ST.bad = !!bad; ST.last = Date.now(); saveST(); render(); }
 
@@ -331,13 +356,17 @@
 
   // ---------------- kirim ke Sheet ----------------
   const isWeb = (u) => /^web$/i.test(String(u || '').trim());
+  // halaman BCA Depo Auto (web) yang sedang terbuka di browser ini, diumumkan lewat penyimpanan Tampermonkey
+  const webInfo = (label) => { let w = null; try { w = JSON.parse(GM_getValue('mgweb@' + kunci(label), 'null')); } catch (e) { w = null; } return w && Date.now() - w.t < 15000 ? w : null; };
+  const websOpen = () => GM_listValues().filter((k) => k.startsWith('mgweb@')).map((k) => { try { return JSON.parse(GM_getValue(k, 'null')); } catch (e) { return null; } }).filter((w) => w && w.web && Date.now() - w.t < 15000);
   function postWeb(c, rows) {
     return new Promise((resolve, reject) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       const slot = H + (rows.length ? '' : '#t');
       const lab = (rows.find((r) => r.label) || {}).label || '';
       GM_deleteValue('mgres@' + slot);
-      GM_setValue('mgreq@' + slot, JSON.stringify({ id, t: Date.now(), label: lab, body: { secret: c.secret, rows } }));
+      const w0 = webInfo(lab || cfg().label);
+      GM_setValue('mgreq@' + slot, JSON.stringify({ id, t: Date.now(), label: lab, body: { secret: (w0 && w0.secret) || c.secret, rows } }));
       const t0 = Date.now();
       const iv = setInterval(() => {
         let r; try { r = JSON.parse(GM_getValue('mgres@' + slot, 'null')); } catch (e) { r = null; }

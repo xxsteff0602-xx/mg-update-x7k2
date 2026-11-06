@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MEGA GAMING - Isi TID + User ID ke Sheet & Auto Confirm Deposit
 // @namespace    mega-gaming
-// @version      4.0
+// @version      4.1
 // @updateURL    https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @downloadURL  https://raw.githubusercontent.com/xxsteff0602-xx/mg-update-x7k2/main/BO-ISI-ID.user.js
 // @description  Baca deposit di BO (semua domain panel UG / GIGA), isi Username + Transaction ID ke Buku di aplikasi MEGA GAMING / BCA Depo Auto versi web (atau Google Sheet), dicocokkan dengan nama pengirim myBCA, dan opsional auto confirm deposit yang cocok.
@@ -33,11 +33,12 @@
         web = String(d.web || ''); alive = true;
         GM_setValue('mgweb@' + kunci(web), JSON.stringify({ rev: d.rev, t: Date.now(), web, secret: String(d.secret || '') }));
         let st = null; try { st = JSON.parse(GM_getValue('mgbo@' + kunci(web), 'null')); } catch (e) { st = null; }
-        window.postMessage({ tag: 'mg-bo', op: 'relay', v: '4.0', bo: st }, location.origin);
+        window.postMessage({ tag: 'mg-bo', op: 'relay', v: '4.1', bo: st }, location.origin);
       }
       if (d.op === 'res' && pend[d.id]) { GM_setValue('mgres@' + pend[d.id], JSON.stringify({ id: d.id, res: d.res })); delete pend[d.id]; }
+      if (d.op === 'poll') pump();                      // halaman memanggil dari worker: tetap jalan walau tab ada di belakang
     });
-    setInterval(() => {
+    const pump = () => {
       if (!alive) return;
       for (const k of GM_listValues()) {
         if (!k.startsWith('mgreq@')) continue;
@@ -49,7 +50,8 @@
         pend[q.id] = k.slice(6); GM_deleteValue(k);
         window.postMessage({ tag: 'mg-bo', op: 'req', id: q.id, body: q.body }, location.origin);
       }
-    }, 250);
+    };
+    setInterval(pump, 250);
     return;
   }
   // Domain panel sering ganti, jadi @include * dipakai. Di luar domain yang ada kata "admin"/"backoffice"
@@ -257,7 +259,7 @@
     if (act === 'test') {
       const ft = root.getElementById('ft'); ft.textContent = 'Menguji…';
       const u = draft.dest === 'web' ? 'web' : String(draft.url || '').trim();
-      if (u === 'web' && !webInfo(draft.label)) { ft.style.color = '#b42318'; ft.textContent = 'Halaman BCA Depo Auto ' + (draft.label || '') + ' belum terbuka di browser ini'; return; }
+      if (u === 'web' && !webInfo(draft.label)) { ft.style.color = '#b42318'; ft.textContent = 'Halaman BCA Depo Auto ' + (draft.label || '') + ' belum terbuka di browser ini' + openList(); return; }
       try { await post({ url: u, secret: String(draft.secret || '').trim() }, []); ft.style.color = '#0a7a52'; ft.textContent = u === 'web' ? 'Terhubung ke BCA Depo Auto ' + draft.label : 'Terhubung dan kode rahasia benar'; }
       catch (err) { ft.style.color = '#b42318'; ft.textContent = 'Gagal: ' + err; }
       return;
@@ -358,6 +360,7 @@
   const isWeb = (u) => /^web$/i.test(String(u || '').trim());
   // halaman BCA Depo Auto (web) yang sedang terbuka di browser ini, diumumkan lewat penyimpanan Tampermonkey
   const webInfo = (label) => { let w = null; try { w = JSON.parse(GM_getValue('mgweb@' + kunci(label), 'null')); } catch (e) { w = null; } return w && Date.now() - w.t < 15000 ? w : null; };
+  const openList = () => { const o = websOpen().map((w) => w.web); return o.length ? ' (yang terbuka: ' + o.join(', ') + ')' : ' (tidak ada halaman BCA Depo Auto yang aktif di Chrome ini)'; };
   const websOpen = () => GM_listValues().filter((k) => k.startsWith('mgweb@')).map((k) => { try { return JSON.parse(GM_getValue(k, 'null')); } catch (e) { return null; } }).filter((w) => w && w.web && Date.now() - w.t < 15000);
   function postWeb(c, rows) {
     return new Promise((resolve, reject) => {
@@ -377,7 +380,7 @@
         if (Date.now() - t0 > 20000) {
           clearInterval(iv); GM_deleteValue('mgreq@' + slot);
           let w = null; try { w = JSON.parse(GM_getValue('mgweb@' + kunci(lab || cfg().label), 'null')); } catch (e) { w = null; }
-          reject(!w || Date.now() - w.t > 15000 ? 'halaman BCA Depo Auto (web)' + (lab ? ' untuk ' + lab : '') + ' belum dibuka di browser ini' : 'halaman BCA Depo Auto (web) tidak menjawab, refresh halamannya');
+          reject(!w || Date.now() - w.t > 15000 ? 'halaman BCA Depo Auto (web)' + (lab ? ' untuk ' + lab : '') + ' belum dibuka di browser ini' + openList() : 'halaman BCA Depo Auto (web) tidak menjawab, refresh halamannya');
         }
       }, 200);
     });
